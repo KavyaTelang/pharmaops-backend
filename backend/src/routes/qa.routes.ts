@@ -1,47 +1,24 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
-import * as qaController from '../controllers/qa.controller';
+import { 
+  getPendingDocuments,
+  reviewDocument,
+  getDocumentDetails,
+} from '../controllers/qa.controller';
+import { authenticateToken, authorizeRole } from '../middleware/auth';
 
 const router = Router();
 
-// All QA routes require authentication and QA role
-router.use(authenticate);
-router.use(authorize('QA'));
+// All routes require authentication and QA role
+router.use(authenticateToken);
+router.use(authorizeRole('QA'));
 
-// ===== REVIEW QUEUE =====
+// Get all documents pending review
+router.get('/documents/pending', getPendingDocuments);
 
-// GET /api/qa/review-queue
-router.get('/review-queue', asyncHandler(qaController.getReviewQueue));
+// Get details of a specific document
+router.get('/documents/:documentId', getDocumentDetails);
 
-// GET /api/qa/documents/:docId/details
-router.get('/documents/:docId/details', asyncHandler(qaController.getDocumentDetails));
-
-// ===== DOCUMENT APPROVAL/REJECTION (21 CFR Part 11 Compliant) =====
-
-// POST /api/qa/documents/:docId/approve
-router.post(
-  '/documents/:docId/approve',
-  [
-    body('password').notEmpty(),
-    body('comments').optional(),
-  ],
-  asyncHandler(qaController.approveDocument)
-);
-
-// POST /api/qa/documents/:docId/reject
-router.post(
-  '/documents/:docId/reject',
-  [
-    body('reason').notEmpty(),
-  ],
-  asyncHandler(qaController.rejectDocument)
-);
-
-// ===== STATS =====
-
-// GET /api/qa/stats
-router.get('/stats', asyncHandler(qaController.getQAStats));
+// Review a document (approve/reject)
+router.post('/documents/:documentId/review', reviewDocument);
 
 export default router;

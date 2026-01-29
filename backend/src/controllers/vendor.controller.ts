@@ -135,7 +135,7 @@ export const uploadDocument = async (req: Request, res: Response) => {
     
     if (docStatus) {
       docStatus.status = 'PENDING_REVIEW';
-      docStatus.documentId = document.id;
+      docStatus.uploadedDocId = document.id;
       await docStatusRepo.save(docStatus);
     }
     

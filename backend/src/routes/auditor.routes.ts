@@ -1,12 +1,24 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
-import { asyncHandler } from '../middleware/errorHandler';
-import * as authController from '../controllers/auditor.controller';
-import { authenticate } from '../middleware/auth';
+import { 
+  getAuditLogs,
+  getOrderTrace,
+  generateComplianceReport,
+} from '../controllers/auditor.controller';
+import { authenticateToken, authorizeRole } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/login', [body('email').isEmail(), body('password').notEmpty()], asyncHandler(authController.login));
-router.get('/me', authenticate, asyncHandler(authController.getCurrentUser));
+// All routes require authentication and AUDITOR role
+router.use(authenticateToken);
+router.use(authorizeRole('AUDITOR'));
+
+// Get audit logs with filters
+router.get('/logs', getAuditLogs);
+
+// Get complete trace for an order
+router.get('/orders/:orderId/trace', getOrderTrace);
+
+// Generate compliance report
+router.post('/reports/generate', generateComplianceReport);
 
 export default router;

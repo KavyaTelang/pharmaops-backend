@@ -3,43 +3,60 @@ import jwt from 'jsonwebtoken';
 import { AppDataSource } from '../database/config';
 import { User } from '../entities';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
 export interface AuthRequest extends Request {
-  user?: User;
-  userId?: string;
-  userRole?: string;
-  companyId?: string;
+  user?: any;
 }
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+// This is what your routes are calling: authenticateToken
+export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: 'No token' });
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
     const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo.findOne({ where: { id: decoded.userId, isActive: true } });
+    const user = await userRepo.findOne({ where: { id: decoded.userId } });
 
-    if (!user) return res.status(401).json({ error: 'Invalid token' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
 
-    req.user = user;
-    req.userId = user.id;
-    req.userRole = user.role;
-    req.companyId = user.companyId;
+    // Attach user info to request
+    req.user = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+    };
+
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
 
-export const authorize = (...roles: string[]) => {
+// This is what your routes are calling: authorizeRole
+export const authorizeRole = (...allowedRoles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.userRole || !roles.includes(req.userRole)) {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();
   };
 };
 
-export const generateToken = (userId: string, role: string, companyId: string): string => {
-  return jwt.sign({ userId, role, companyId }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+// Helper function to generate JWT tokens
+export const generateToken = (userId: string, email: string, role: string): string => {
+  return jwt.sign(
+    { userId, email, role },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 };

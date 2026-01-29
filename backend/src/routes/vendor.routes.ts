@@ -1,55 +1,28 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
-import multer from 'multer';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
-import * as vendorController from '../controllers/vendor.controller';
+import { 
+  getMyOrders,
+  acceptOrder,
+  uploadDocument,
+  createShipment,
+} from '../controllers/vendor.controller';
+import { authenticateToken, authorizeRole } from '../middleware/auth';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
-// All vendor routes require authentication and VENDOR role
-router.use(authenticate);
-router.use(authorize('VENDOR'));
+// All routes require authentication and VENDOR role
+router.use(authenticateToken);
+router.use(authorizeRole('VENDOR'));
 
-// ===== ORDER MANAGEMENT =====
+// Get orders assigned to this vendor
+router.get('/orders', getMyOrders);
 
-// GET /api/vendor/my-requests
-router.get('/my-requests', asyncHandler(vendorController.getMyRequests));
+// Accept an order request
+router.post('/orders/:orderId/accept', acceptOrder);
 
-// POST /api/vendor/orders/:orderId/accept
-router.post('/orders/:orderId/accept', asyncHandler(vendorController.acceptOrder));
+// Upload a compliance document
+router.post('/documents/upload', uploadDocument);
 
-// GET /api/vendor/orders/:orderId/checklist
-router.get('/orders/:orderId/checklist', asyncHandler(vendorController.getOrderChecklist));
-
-// ===== DOCUMENT UPLOAD =====
-
-// POST /api/vendor/documents/upload
-router.post(
-  '/documents/upload',
-  upload.single('file'),
-  [
-    body('orderId').isUUID(),
-    body('docType').notEmpty(),
-  ],
-  asyncHandler(vendorController.uploadDocument)
-);
-
-// ===== SHIPMENT MANAGEMENT =====
-
-// POST /api/vendor/shipments/create
-router.post(
-  '/shipments/create',
-  [
-    body('orderId').isUUID(),
-    body('trackingNumber').notEmpty(),
-    body('courierName').notEmpty(),
-  ],
-  asyncHandler(vendorController.createShipment)
-);
-
-// GET /api/vendor/shipments
-router.get('/shipments', asyncHandler(vendorController.getMyShipments));
+// Create shipment with tracking
+router.post('/shipments/create', createShipment);
 
 export default router;

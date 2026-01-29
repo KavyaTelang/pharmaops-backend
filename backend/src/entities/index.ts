@@ -118,12 +118,12 @@ export class OrderDocumentStatus {
 export class DocumentRequirement {
   @PrimaryGeneratedColumn('uuid') id!: string;
   @Column('uuid') productId!: string;
-  @Column() country!: string;
+  @Column() destination!: string;
   @Column() docType!: string;
   @Column() uploaderRole!: string;
   @Column() category!: string;
   @Column({ type: 'text', nullable: true }) requirement!: string;
-  
+
   // MISSING COLUMN: Required by defineComplianceRule controller
   @Column('uuid') companyId!: string;
 
@@ -153,6 +153,11 @@ export class Document {
   @Column('uuid') companyId!: string;
   @Column('uuid') uploadedById!: string;
 
+  // MISSING COLUMNS: Required by QA and Auditor controllers
+  @Column('uuid', { nullable: true }) reviewedById!: string;
+  @Column({ type: 'timestamp', nullable: true }) reviewedAt!: Date;
+  @Column({ type: 'text', nullable: true }) reviewComments!: string;
+
   @CreateDateColumn() createdAt!: Date;
   @UpdateDateColumn() updatedAt!: Date;
 }
@@ -170,6 +175,7 @@ export class VendorProductAssignment {
 export class Shipment {
   @PrimaryGeneratedColumn('uuid') id!: string;
   @Column('uuid', { unique: true }) orderId!: string;
+  @Column() orderNumber!: string;
   @Column() trackingNumber!: string;
   @Column({ nullable: true }) courierName!: string;
   @Column({ default: 'PREPARING' }) status!: string;
@@ -177,6 +183,8 @@ export class Shipment {
   @Column('decimal', { precision: 10, scale: 6, nullable: true }) latitude!: number;
   @Column('decimal', { precision: 10, scale: 6, nullable: true }) longitude!: number;
   @Column({ type: 'timestamp', nullable: true }) estimatedArrival!: Date;
+  @Column('uuid') companyId!: string;
+  @Column('uuid') createdById!: string;
   @CreateDateColumn() createdAt!: Date;
   @UpdateDateColumn() updatedAt!: Date;
 }
