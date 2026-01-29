@@ -121,20 +121,24 @@ const AdminDashboard = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteCompanyName, setInviteCompanyName] = useState('');
   const [inviteCapacity, setInviteCapacity] = useState(1000);
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const [ruleProductId, setRuleProductId] = useState('');
   const [ruleRequirement, setRuleRequirement] = useState('');
   const [ruleDocType, setRuleDocType] = useState('');
   const [ruleCategory, setRuleCategory] = useState<'MASTER' | 'TRANSACTIONAL'>('TRANSACTIONAL');
+  const [ruleLoading, setRuleLoading] = useState(false);
 
   const [masterDocFile, setMasterDocFile] = useState<File | null>(null);
   const [masterDocProductId, setMasterDocProductId] = useState('');
   const [masterDocType, setMasterDocType] = useState('');
+  const [masterDocLoading, setMasterDocLoading] = useState(false);
 
   const [orderVendorId, setOrderVendorId] = useState('');
   const [orderProductId, setOrderProductId] = useState('');
   const [orderQuantity, setOrderQuantity] = useState(500);
   const [orderDestination, setOrderDestination] = useState('');
+  const [orderLoading, setOrderLoading] = useState(false);
 
   const [selectedShipment, setSelectedShipment] = useState<string | null>(null);
   const [loadingTracking, setLoadingTracking] = useState(false);
@@ -181,40 +185,57 @@ const AdminDashboard = () => {
       alert('Please fill in all fields');
       return;
     }
-    
+
+    setInviteLoading(true);
     try {
-      // TODO: Implement this in your api service first
-      // await api.inviteVendor({
-      //   email: inviteEmail,
-      //   companyName: inviteCompanyName,
-      //   capacity: inviteCapacity,
-      // });
-      
+      await api.inviteVendor({
+        email: inviteEmail,
+        companyName: inviteCompanyName,
+        capacity: inviteCapacity,
+      });
+
       alert(`✅ Vendor invite sent to ${inviteCompanyName}!`);
       setInviteEmail('');
       setInviteCompanyName('');
       setInviteCapacity(1000);
-      
+
       // Reload vendors
       await loadAllData();
     } catch (error) {
       console.error('Error inviting vendor:', error);
       alert('Failed to invite vendor');
+    } finally {
+      setInviteLoading(false);
     }
   };
 
-  const handleDefineReqs = () => {
+  const handleDefineReqs = async () => {
     if (!ruleProductId || !ruleRequirement || !ruleDocType) {
       alert('Please fill in all fields');
       return;
     }
-    
-    const product = products.find(p => p.id === ruleProductId);
-    alert(`✅ Compliance rule defined for ${product?.name}`);
-    setRuleProductId('');
-    setRuleRequirement('');
-    setRuleDocType('');
-    setRuleCategory('TRANSACTIONAL');
+
+    setRuleLoading(true);
+    try {
+      await api.defineComplianceRule({
+        productId: ruleProductId,
+        requirement: ruleRequirement,
+        docType: ruleDocType,
+        category: ruleCategory,
+      });
+
+      const product = products.find(p => p.id === ruleProductId);
+      alert(`✅ Compliance rule defined for ${product?.name}`);
+      setRuleProductId('');
+      setRuleRequirement('');
+      setRuleDocType('');
+      setRuleCategory('TRANSACTIONAL');
+    } catch (error) {
+      console.error('Error defining rule:', error);
+      alert('Failed to define compliance rule');
+    } finally {
+      setRuleLoading(false);
+    }
   };
 
   const handleMasterDocUpload = () => {
@@ -234,29 +255,31 @@ const AdminDashboard = () => {
       alert('Please fill in all fields');
       return;
     }
-    
+
+    setOrderLoading(true);
     try {
-      // TODO: Implement this in your api service first
-      // await api.createOrder({
-      //   vendorId: orderVendorId,
-      //   productId: orderProductId,
-      //   quantity: orderQuantity,
-      //   destination: orderDestination,
-      // });
-      
+      await api.createOrder({
+        vendorId: orderVendorId,
+        productId: orderProductId,
+        quantity: orderQuantity,
+        destination: orderDestination,
+      });
+
       const vendor = vendors.find(v => v.id === orderVendorId);
       const product = products.find(p => p.id === orderProductId);
       alert(`✅ Order created for ${vendor?.companyName} - ${product?.name}`);
-      
+
       setOrderVendorId('');
       setOrderProductId('');
       setOrderQuantity(500);
       setOrderDestination('');
-      
+
       await loadAllData();
     } catch (error) {
       console.error('Error creating order:', error);
       alert('Failed to create order');
+    } finally {
+      setOrderLoading(false);
     }
   };
 

@@ -1,42 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { api } from '../services/api';
 
 const VendorDashboard = () => {
   // ===== USE CONTEXT =====
-  const { user } = useAppContext();
-  
-  // ===== REAL DATA FROM BACKEND =====
-  const [vendors, setVendors] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Load data on mount
-  useEffect(() => {
-    loadAllData();
-  }, []);
-
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
-      // TODO: Add vendor-specific endpoints to backend
-      // For now, using available endpoints
-      const [productsData] = await Promise.all([
-        api.getProducts(),
-      ]);
-      
-      setProducts(productsData.products || []);
-      
-      // Mock vendor and orders for now - will be replaced with real endpoints
-      setVendors([]);
-      setOrders([]);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    user,
+    products,
+    vendors,
+    orders
+  } = useAppContext();
 
   // ===== LOCAL STATE =====
   const [shipmentModalOpen, setShipmentModalOpen] = useState<string | null>(null);
@@ -53,7 +25,7 @@ const VendorDashboard = () => {
 
   // Get current vendor
   const currentVendor = vendors.find(v => v.id === selectedVendorId);
-  
+
   // Filter orders for this vendor
   const vendorOrders = orders.filter(o => o.vendorId === selectedVendorId);
 
@@ -72,11 +44,11 @@ const VendorDashboard = () => {
   // ===== HANDLERS (updated to use real API) =====
   const handleAcceptInvitation = async () => {
     if (!selectedVendorId) return;
-    
+
     try {
       // TODO: Add accept invitation endpoint to backend
       alert(`✅ Partnership accepted! You can now receive orders.`);
-      await loadAllData();
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
     } catch (error) {
       alert('Failed to accept invitation');
     }
@@ -86,16 +58,16 @@ const VendorDashboard = () => {
     try {
       // TODO: Add accept order endpoint to backend
       // await api.acceptOrder(orderId);
-      
+
       const order = orders.find(o => o.id === orderId);
       alert(`✅ Order ${order?.orderNumber} accepted! Compliance checklist generated.`);
-      await loadAllData();
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
     } catch (error) {
       alert('Failed to accept order');
     }
   };
 
-  const handleUpload = (orderId: string, docType: string) => {
+  const handleUpload = (_orderId: string, _docType: string) => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'application/pdf';
@@ -106,9 +78,9 @@ const VendorDashboard = () => {
         try {
           // TODO: Add document upload endpoint to backend
           // await api.uploadDocument(orderId, docType, file);
-          
+
           alert(`✅ Document uploaded: ${file.name}\nSent to QA for review.`);
-          await loadAllData();
+          await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
         } catch (error) {
           alert('Failed to upload document');
         }
@@ -127,15 +99,15 @@ const VendorDashboard = () => {
     try {
       // TODO: Add create shipment endpoint to backend
       // await api.createShipment(shipmentModalOpen, trackingInput, courierInput);
-      
+
       const order = orders.find(o => o.id === shipmentModalOpen);
       alert(`✅ Shipment created for Order ${order?.orderNumber}!\nTracking: ${trackingInput}`);
-      
+
       setShipmentModalOpen(null);
       setTrackingInput('');
       setCourierInput('');
-      
-      await loadAllData();
+
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
     } catch (error) {
       alert('Failed to create shipment');
     }
@@ -144,9 +116,9 @@ const VendorDashboard = () => {
   // ===== HELPERS =====
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'APPROVED': return '#10b981'; 
-      case 'PENDING_REVIEW': return '#f59e0b'; 
-      case 'MISSING': return '#ef4444'; 
+      case 'APPROVED': return '#10b981';
+      case 'PENDING_REVIEW': return '#f59e0b';
+      case 'MISSING': return '#ef4444';
       default: return '#9ca3af';
     }
   };
@@ -165,10 +137,10 @@ const VendorDashboard = () => {
     if (!currentVendor || currentVendor.status !== 'INVITED') return null;
 
     return (
-      <div className="vd-card vd-animate-in" style={{background: '#fef3c7', borderLeft: '4px solid #f59e0b', marginBottom: '2rem'}}>
-        <div style={{padding: '1.5rem'}}>
-          <h3 style={{margin: '0 0 0.5rem 0', color: '#92400e'}}>🎉 Partnership Invitation</h3>
-          <p style={{margin: '0 0 1rem 0', color: '#78350f'}}>
+      <div className="vd-card vd-animate-in" style={{ background: '#fef3c7', borderLeft: '4px solid #f59e0b', marginBottom: '2rem' }}>
+        <div style={{ padding: '1.5rem' }}>
+          <h3 style={{ margin: '0 0 0.5rem 0', color: '#92400e' }}>🎉 Partnership Invitation</h3>
+          <p style={{ margin: '0 0 1rem 0', color: '#78350f' }}>
             You have been invited to join the PharmaOps platform. Accept to start receiving orders.
           </p>
           <button onClick={handleAcceptInvitation} className="vd-btn primary">
@@ -220,7 +192,7 @@ const VendorDashboard = () => {
 
   const renderComplianceList = () => {
     const activeOrders = vendorOrders.filter(o => o.status === 'DOCS_PENDING' || o.status === 'READY_TO_SHIP');
-    
+
     if (activeOrders.length === 0) return <div className="vd-empty">No active compliance tasks.</div>;
 
     return (
@@ -238,11 +210,11 @@ const VendorDashboard = () => {
               <div className="vd-todo-header">
                 <div>
                   <div className="vd-order-id">
-                    {order.orderNumber} 
+                    {order.orderNumber}
                     <span className="vd-badge-count">{product?.name || 'Unknown Product'}</span>
                   </div>
                   <div className="vd-order-meta">
-                    <span className="meta-label">Dest:</span> {order.destination} &nbsp;|&nbsp; 
+                    <span className="meta-label">Dest:</span> {order.destination} &nbsp;|&nbsp;
                     <span className="meta-label">Qty:</span> {order.quantity.toLocaleString()}
                   </div>
                   <div className="vd-progress-container">
@@ -253,7 +225,7 @@ const VendorDashboard = () => {
                   </div>
                 </div>
                 <div className="action-container">
-                  <button 
+                  <button
                     className={`vd-btn ${isReady ? 'primary' : 'disabled'}`}
                     disabled={!isReady}
                     onClick={() => isReady && setShipmentModalOpen(order.id)}
@@ -302,7 +274,7 @@ const VendorDashboard = () => {
   };
 
   // Show loading state
-  if (loading) {
+  if (!user && vendors.length === 0) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', background: 'white', minHeight: '100vh' }}>
         <h2>Loading vendor dashboard...</h2>
@@ -320,7 +292,7 @@ const VendorDashboard = () => {
           </div>
         </header>
         <main className="vd-main">
-          <div className="vd-empty" style={{marginTop: '3rem'}}>
+          <div className="vd-empty" style={{ marginTop: '3rem' }}>
             No vendor profile found. Admin needs to invite you first.
           </div>
         </main>
@@ -563,21 +535,21 @@ const VendorDashboard = () => {
           <div className="vd-modal-overlay">
             <div className="vd-modal vd-animate-in">
               <h3>Create Shipment for {vendorOrders.find(o => o.id === shipmentModalOpen)?.orderNumber}</h3>
-              <p style={{marginBottom:'1.5rem', color:'#6b7280', fontSize:'0.9rem'}}>
+              <p style={{ marginBottom: '1.5rem', color: '#6b7280', fontSize: '0.9rem' }}>
                 Compliance verified. Enter logistics details to generate label.
               </p>
-              
-              <label style={{display:'block', marginBottom:'0.5rem', fontWeight:500}}>Courier Service</label>
-              <input 
-                className="vd-input" 
-                placeholder="e.g. DHL, FedEx, Maersk" 
+
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Courier Service</label>
+              <input
+                className="vd-input"
+                placeholder="e.g. DHL, FedEx, Maersk"
                 value={courierInput}
                 onChange={e => setCourierInput(e.target.value)}
               />
 
-              <label style={{display:'block', marginBottom:'0.5rem', fontWeight:500}}>Tracking Number</label>
-              <input 
-                className="vd-input" 
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Tracking Number</label>
+              <input
+                className="vd-input"
                 placeholder="Scan or enter tracking ID"
                 value={trackingInput}
                 onChange={e => setTrackingInput(e.target.value)}
