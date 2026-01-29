@@ -14,10 +14,11 @@ const router = Router();
 
 // All admin routes require authentication and admin role
 router.use(authenticateToken);
-router.use(authorizeRole('ADMIN'));
+// Get all products (Shared with Vendor)
+router.get('/products', authorizeRole('ADMIN', 'VENDOR'), getProducts);
 
-// Get all products
-router.get('/products', getProducts);
+// All other admin routes require admin role
+router.use(authorizeRole('ADMIN'));
 
 // Get all vendors
 router.get('/vendors', getVendors);

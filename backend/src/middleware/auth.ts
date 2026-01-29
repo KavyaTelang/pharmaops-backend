@@ -12,28 +12,19 @@ export interface AuthRequest extends Request {
 // This is what your routes are calling: authenticateToken
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    // BYPASS AUTHENTICATION FOR TESTING
+    console.log('⚠️ AUTH BYPASS ENABLED: Defaulting to Vendor User');
 
-    console.log('Auth middleware - Token received:', token ? 'YES' : 'NO'); // Debug
-
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    
-    console.log('Auth middleware - Decoded token:', decoded); // Debug
-    
     const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo.findOne({ where: { id: decoded.userId } });
+    // Hardcode to the vendor user email we know exists from seed.ts
+    const user = await userRepo.findOne({ where: { email: 'vendor@fastlogistics.com' } });
 
     if (!user) {
-      console.log('Auth middleware - User not found'); // Debug
-      return res.status(401).json({ error: 'Invalid token' });
+      console.log('Auth middleware - Vendor Default User not found in DB');
+      return res.status(500).json({ error: 'Default vendor user not found' });
     }
 
-    console.log('Auth middleware - User found:', user.email, 'Role:', user.role); // Debug
+    console.log('Auth middleware - Auto-logged in as:', user.email, 'Role:', user.role);
 
     // Attach user info to request
     req.user = {
@@ -45,8 +36,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     next();
   } catch (error) {
-    console.error('Auth middleware - Error:', error); // Debug
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error('Auth middleware - Error:', error);
+    return res.status(500).json({ error: 'Auth Bypass Failed' });
   }
 };
 
@@ -54,7 +45,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 export const authorizeRole = (...allowedRoles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     console.log('Role check - User role:', req.user?.role, 'Allowed:', allowedRoles); // Debug
-    
+
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../database/config';
-import { User } from '../entities';
+import { User, VendorProfile } from '../entities';
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -30,7 +30,7 @@ export const login = async (req: Request, res: Response) => {
     // ✅ Convert to string explicitly
     const passwordHash: string = user.passwordHash;
     const passwordInput: string = password;
-    
+
     const isValidPassword = await bcrypt.compare(passwordInput, passwordHash);
 
     if (!isValidPassword) {
@@ -43,6 +43,13 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: JWT_EXPIRY }
     );
 
+    // Get vendor profile if user is a vendor
+    let vendorProfile = null;
+    if (user.role === 'VENDOR') {
+      const vendorProfileRepo = AppDataSource.getRepository(VendorProfile);
+      vendorProfile = await vendorProfileRepo.findOne({ where: { userId: user.id } });
+    }
+
     res.json({
       token,
       user: {
@@ -50,6 +57,7 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        vendorProfile,
       },
     });
   } catch (error) {
@@ -68,12 +76,20 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Get vendor profile if user is a vendor
+    let vendorProfile = null;
+    if (user.role === 'VENDOR') {
+      const vendorProfileRepo = AppDataSource.getRepository(VendorProfile);
+      vendorProfile = await vendorProfileRepo.findOne({ where: { userId: user.id } });
+    }
+
     res.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
+        vendorProfile,
       },
     });
   } catch (error) {
