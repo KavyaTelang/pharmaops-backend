@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: pharmaops
       POSTGRES_PASSWORD: pharmaops_secure_2024
-      POSTGRES_DB: pharmaops_db
+      POSTGRES_DB: pharmaops
     ports:
       - "5432:5432"
     volumes:
@@ -44,7 +44,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://pharmaops:pharmaops_secure_2024@postgres:5432/pharmaops_db
+      DATABASE_URL: postgresql://pharmaops:pharmaops_secure_2024@postgres:5432/pharmaops
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
       JWT_EXPIRY: 24h
@@ -80,6 +80,19 @@ services:
     networks:
       - pharmaops_network
     command: server /data --console-address ":9001"
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile # Ensure you have a Dockerfile in your frontend folder
+    container_name: pharmaops_frontend
+    ports:
+      - "5173:5173" # Standard Vite port
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
 
 volumes:
   postgres_data:
@@ -88,3 +101,4 @@ volumes:
 networks:
   pharmaops_network:
     driver: bridge
+
