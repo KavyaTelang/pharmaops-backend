@@ -50,6 +50,7 @@ const seed = async () => {
             licenseNumber: 'LIC-FL-2024',
             warehouseAddress: 'Berlin Dock 4',
             status: 'ACCEPTED',
+            companyId: company.id, // ✅ ADDED THIS LINE
           });
           await vendorProfileRepo.save(vendorProfile);
           console.log('✅ Vendor profile created');

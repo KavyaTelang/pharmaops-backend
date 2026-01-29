@@ -1,10 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../database/config';
-import { Order } from '../entities';
-import { OrderDocumentStatus } from '../entities';
-import { Document } from '../entities';
-import { Shipment } from '../entities';
-import { VendorProfile } from '../entities';
+import { Order, OrderDocumentStatus, Document, Shipment, VendorProfile } from '../entities';
 
 // Get orders for this vendor
 export const getMyOrders = async (req: Request, res: Response) => {
@@ -16,7 +12,7 @@ export const getMyOrders = async (req: Request, res: Response) => {
     
     // Get vendor profile for this user
     const vendorProfile = await vendorProfileRepo.findOne({
-      where: { userId: user.id },
+      where: { userId: user.userId },
     });
     
     if (!vendorProfile) {
@@ -110,21 +106,17 @@ export const uploadDocument = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // In a real implementation, you would:
-    // 1. Upload file to S3/MinIO
-    // 2. Store file URL in database
-    // For now, we'll just store metadata
-    
     const document = documentRepo.create({
       orderId,
       productId: order.productId,
       docType,
       fileName,
-      filePath: `/uploads/documents/${orderId}/${fileName}`, // Mock path
+      filePath: `/uploads/documents/${orderId}/${fileName}`,
       status: 'PENDING_REVIEW',
       category: 'TRANSACTIONAL',
       companyId: user.companyId,
-      uploadedById: user.id,
+      uploadedById: user.userId,
+      uploadedBy: user.userId,
     });
     await documentRepo.save(document);
     
@@ -179,10 +171,12 @@ export const createShipment = async (req: Request, res: Response) => {
       orderNumber: order.orderNumber,
       trackingNumber,
       courier,
+      courierName: courier,
       status: 'IN_TRANSIT',
-      location: 'Warehouse', // Initial location
+      location: 'Warehouse',
+      currentLocation: 'Warehouse',
       companyId: user.companyId,
-      createdById: user.id,
+      createdById: user.userId,
     });
     await shipmentRepo.save(shipment);
     
