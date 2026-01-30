@@ -1,41 +1,24 @@
 import { Router } from 'express';
-import { 
-  getProducts, 
-  getVendors, 
-  getOrders, 
-  createOrderRequest,
-  inviteVendor,
-  defineComplianceRule,
-  uploadMasterSOP,
-} from '../controllers/admin.controller';
 import { authenticateToken, authorizeRole } from '../middleware/auth';
+import * as adminController from '../controllers/admin.controller';
 
 const router = Router();
 
-// All admin routes require authentication and admin role
+// All routes require ADMIN role
 router.use(authenticateToken);
-// Get all products (Shared with Vendor)
-router.get('/products', authorizeRole('ADMIN', 'VENDOR'), getProducts);
-
-// All other admin routes require admin role
 router.use(authorizeRole('ADMIN'));
 
-// Get all vendors
-router.get('/vendors', getVendors);
+// Data retrieval routes
+router.get('/products', adminController.getProducts);
+router.get('/vendors', adminController.getVendors);
+router.get('/orders', adminController.getOrders);
+router.get('/documents', adminController.getDocuments);
+router.get('/shipments', adminController.getShipments);
 
-// Get all orders
-router.get('/orders', getOrders);
-
-// Create new order request
-router.post('/orders/create-request', createOrderRequest);
-
-// Invite new vendor
-router.post('/vendors/invite', inviteVendor);
-
-// Define compliance rule for product
-router.post('/compliance/define-rule', defineComplianceRule);
-
-// Upload master SOP document
-router.post('/documents/upload-master', uploadMasterSOP);
+// Action routes
+router.post('/orders/create-request', adminController.createOrderRequest);
+router.post('/vendors/invite', adminController.inviteVendor);
+router.post('/compliance/define-rule', adminController.defineComplianceRule);
+router.post('/documents/upload-master', adminController.uploadMasterSOP);
 
 export default router;

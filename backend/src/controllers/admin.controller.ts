@@ -7,7 +7,8 @@ import { Order } from '../entities';
 import { OrderDocumentStatus } from '../entities';
 import { DocumentRequirement } from '../entities';
 import { Document } from '../entities';
-import bcrypt from 'bcrypt';
+import { Shipment } from '../entities';
+const bcrypt = require('bcrypt');
 
 // Get all products
 export const getProducts = async (req: Request, res: Response) => {
@@ -77,6 +78,55 @@ export const getOrders = async (req: Request, res: Response) => {
   }
 };
 
+// Get all documents for dashboard stats
+export const getDocuments = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const documentRepo = AppDataSource.getRepository(Document);
+    
+    const documents = await documentRepo.find({
+      where: { companyId: user.companyId },
+      order: { createdAt: 'DESC' },
+    });
+    
+    res.json({ documents });
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+};
+
+// Get all shipments for tracking
+export const getShipments = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const shipmentRepo = AppDataSource.getRepository(Shipment);
+    
+    const shipments = await shipmentRepo.find({
+      where: { companyId: user.companyId },
+      order: { createdAt: 'DESC' },
+    });
+    
+    // Format for frontend
+    const formattedShipments = shipments.map(s => ({
+      id: s.id,
+      orderNumber: s.orderNumber,
+      trackingNumber: s.trackingNumber,
+      status: s.status,
+      location: s.currentLocation || s.location || 'In Transit',
+      courier: s.courierName || s.courier,
+      estimatedArrival: s.estimatedArrival,
+      lat: s.latitude,
+      lng: s.longitude,
+    }));
+    
+    res.json({ shipments: formattedShipments });
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    res.status(500).json({ error: 'Failed to fetch shipments' });
+  }
+};
+
 // Create new order request
 export const createOrderRequest = async (req: Request, res: Response) => {
   try {
@@ -105,7 +155,7 @@ export const createOrderRequest = async (req: Request, res: Response) => {
       destination,
       status: 'REQUESTED',
       companyId: user.companyId,
-      createdById: user.id,
+      createdById: user.userId,
     });
     await orderRepo.save(order);
     
@@ -253,7 +303,8 @@ export const uploadMasterSOP = async (req: Request, res: Response) => {
       status: 'APPROVED', // Master docs are pre-approved
       category: 'MASTER',
       companyId: user.companyId,
-      uploadedById: user.id,
+      uploadedById: user.userId,
+      uploadedBy: user.userId,
     });
     await documentRepo.save(document);
     

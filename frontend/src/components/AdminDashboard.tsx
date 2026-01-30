@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '../services/api';
 
 // --- CONFIGURATION ---
-const GOOGLE_MAPS_API_KEY = "AIzaSyCo-qWtuSCF2MkDv7AhMGbFwPwauHhALRk"; 
+const GOOGLE_MAPS_API_KEY = "AIzaSyCo-qWtuSCF2MkDv7AhMGbFwPwauHhALRk";
 
 // --- GOOGLE MAP TYPES ---
 interface GoogleMapInstance {
@@ -80,7 +80,7 @@ const GoogleMapViewer = ({ lat, lng }: { lat?: number; lng?: number }) => {
         zoom: 12,
         styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
       });
-      
+
       markerRef.current = new google.maps.Marker({
         position: center,
         map: mapInstanceRef.current,
@@ -116,6 +116,7 @@ const AdminDashboard = () => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [shipments, setShipments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Form states
   const [inviteEmail, setInviteEmail] = useState('');
@@ -150,22 +151,26 @@ const AdminDashboard = () => {
 
   const loadAllData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [productsData, vendorsData, ordersData] = await Promise.all([
-        api.getProducts(),
-        api.getVendors(),
-        api.getOrders(),
+      const [productsData, vendorsData, ordersData, documentsData, shipmentsData] = await Promise.all([
+        api.getProducts().catch(err => ({ products: [] })),
+        api.getVendors().catch(err => ({ vendors: [] })),
+        api.getOrders().catch(err => ({ orders: [] })),
+        api.getDocuments().catch(err => ({ documents: [] })),
+        api.getShipments().catch(err => ({ shipments: [] })),
       ]);
-      
+
+      console.log('Loaded data:', { productsData, vendorsData, ordersData, documentsData, shipmentsData });
+
       setProducts(productsData.products || []);
       setVendors(vendorsData.vendors || []);
       setOrders(ordersData.orders || []);
-      
-      // TODO: Add these endpoints later
-      setDocuments([]);
-      setShipments([]);
-    } catch (error) {
+      setDocuments(documentsData.documents || []);
+      setShipments(shipmentsData.shipments || []);
+    } catch (error: any) {
       console.error('Failed to load data:', error);
+      setError(error.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -179,7 +184,7 @@ const AdminDashboard = () => {
   };
 
   // ===== HANDLERS =====
-  
+
   const handleInviteVendor = async () => {
     if (!inviteEmail || !inviteCompanyName) {
       alert('Please fill in all fields');
@@ -188,22 +193,23 @@ const AdminDashboard = () => {
 
     setInviteLoading(true);
     try {
-      await api.inviteVendor({
+      const result = await api.inviteVendor({
         email: inviteEmail,
         companyName: inviteCompanyName,
         capacity: inviteCapacity,
       });
 
-      alert(`✅ Vendor invite sent to ${inviteCompanyName}!`);
+      alert(`✅ Vendor invited!\n\nEmail: ${inviteEmail}\nCompany: ${inviteCompanyName}\nTemp Password: ${result.vendor.tempPassword}\n\nPlease share the temp password with the vendor.`);
+      
       setInviteEmail('');
       setInviteCompanyName('');
       setInviteCapacity(1000);
 
       // Reload vendors
       await loadAllData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error inviting vendor:', error);
-      alert('Failed to invite vendor');
+      alert(`❌ Failed to invite vendor: ${error.message}`);
     } finally {
       setInviteLoading(false);
     }
@@ -225,29 +231,52 @@ const AdminDashboard = () => {
       });
 
       const product = products.find(p => p.id === ruleProductId);
-      alert(`✅ Compliance rule defined for ${product?.name}`);
+      alert(`✅ Compliance rule defined for ${product?.name}!\n\nRequirement: ${ruleRequirement}\nDoc Type: ${ruleDocType}`);
+      
       setRuleProductId('');
       setRuleRequirement('');
       setRuleDocType('');
       setRuleCategory('TRANSACTIONAL');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error defining rule:', error);
-      alert('Failed to define compliance rule');
+      alert(`❌ Failed to define compliance rule: ${error.message}`);
     } finally {
       setRuleLoading(false);
     }
   };
 
-  const handleMasterDocUpload = () => {
+  const handleMasterDocUpload = async () => {
     if (!masterDocFile || !masterDocProductId || !masterDocType) {
       alert('Please fill in all fields and select a file');
       return;
     }
-    
-    alert(`✅ Master SOP uploaded: ${masterDocFile.name}`);
-    setMasterDocFile(null);
-    setMasterDocProductId('');
-    setMasterDocType('');
+
+    setMasterDocLoading(true);
+    try {
+      await api.uploadMasterSOP({
+        productId: masterDocProductId,
+        docType: masterDocType,
+        fileName: masterDocFile.name,
+      });
+
+      const product = products.find(p => p.id === masterDocProductId);
+      alert(`✅ Master SOP uploaded!\n\nProduct: ${product?.name}\nFile: ${masterDocFile.name}\nType: ${masterDocType}`);
+      
+      setMasterDocFile(null);
+      setMasterDocProductId('');
+      setMasterDocType('');
+      
+      // Reset file input
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      if (fileInput) fileInput.value = '';
+      
+      await loadAllData();
+    } catch (error: any) {
+      console.error('Error uploading master doc:', error);
+      alert(`❌ Failed to upload master SOP: ${error.message}`);
+    } finally {
+      setMasterDocLoading(false);
+    }
   };
 
   const handleCreateRequest = async () => {
@@ -258,7 +287,7 @@ const AdminDashboard = () => {
 
     setOrderLoading(true);
     try {
-      await api.createOrder({
+      const result = await api.createOrder({
         vendorId: orderVendorId,
         productId: orderProductId,
         quantity: orderQuantity,
@@ -267,7 +296,8 @@ const AdminDashboard = () => {
 
       const vendor = vendors.find(v => v.id === orderVendorId);
       const product = products.find(p => p.id === orderProductId);
-      alert(`✅ Order created for ${vendor?.companyName} - ${product?.name}`);
+      
+      alert(`✅ Order created!\n\nOrder #: ${result.order.orderNumber}\nVendor: ${vendor?.companyName}\nProduct: ${product?.name}\nQuantity: ${orderQuantity}\nDestination: ${orderDestination}`);
 
       setOrderVendorId('');
       setOrderProductId('');
@@ -275,9 +305,9 @@ const AdminDashboard = () => {
       setOrderDestination('');
 
       await loadAllData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating order:', error);
-      alert('Failed to create order');
+      alert(`❌ Failed to create order: ${error.message}`);
     } finally {
       setOrderLoading(false);
     }
@@ -296,6 +326,31 @@ const AdminDashboard = () => {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', background: 'white', minHeight: '100vh' }}>
         <h2>Loading dashboard...</h2>
+        <p style={{ color: '#6b7280', marginTop: '1rem' }}>Fetching products, vendors, orders, and shipments...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', background: 'white', minHeight: '100vh' }}>
+        <h2 style={{ color: '#dc2626' }}>⚠️ Error Loading Dashboard</h2>
+        <p style={{ color: '#6b7280', marginTop: '1rem' }}>{error}</p>
+        <button 
+          onClick={loadAllData}
+          style={{ 
+            marginTop: '1rem', 
+            padding: '0.5rem 1rem', 
+            background: '#4f46e5', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -411,6 +466,7 @@ const AdminDashboard = () => {
         .ad-status-pill { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
         .ad-status-pill.delivered { background: #d1fae5; color: #065f46; }
         .ad-status-pill.in_transit { background: #dbeafe; color: #1e40af; }
+        .ad-status-pill.preparing { background: #fef3c7; color: #92400e; }
 
         /* Tracking Panel */
         .ad-tracking-panel { border-top: 1px solid #e5e7eb; background: #f8fafc; animation: slideDown 0.3s ease-out; }
@@ -462,31 +518,36 @@ const AdminDashboard = () => {
               <div className="ad-card-body">
                 <div className="ad-form-group">
                   <label>Vendor Email</label>
-                  <input 
-                    type="email" 
-                    placeholder="supply@global-logistics.com" 
-                    value={inviteEmail} 
-                    onChange={(e) => setInviteEmail(e.target.value)} 
+                  <input
+                    type="email"
+                    placeholder="supply@global-logistics.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    disabled={inviteLoading}
                   />
                 </div>
                 <div className="ad-form-group">
                   <label>Company Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="Global Logistics Inc." 
-                    value={inviteCompanyName} 
-                    onChange={(e) => setInviteCompanyName(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="Global Logistics Inc."
+                    value={inviteCompanyName}
+                    onChange={(e) => setInviteCompanyName(e.target.value)}
+                    disabled={inviteLoading}
                   />
                 </div>
                 <div className="ad-form-group">
                   <label>Capacity (Units)</label>
-                  <input 
-                    type="number" 
-                    value={inviteCapacity} 
-                    onChange={(e) => setInviteCapacity(Number(e.target.value))} 
+                  <input
+                    type="number"
+                    value={inviteCapacity}
+                    onChange={(e) => setInviteCapacity(Number(e.target.value))}
+                    disabled={inviteLoading}
                   />
                 </div>
-                <button onClick={handleInviteVendor} className="ad-btn primary">Send Invite</button>
+                <button onClick={handleInviteVendor} className="ad-btn primary" disabled={inviteLoading}>
+                  {inviteLoading ? 'Inviting...' : 'Send Invite'}
+                </button>
               </div>
             </div>
 
@@ -496,37 +557,41 @@ const AdminDashboard = () => {
               <div className="ad-card-body">
                 <div className="ad-form-group">
                   <label>Product</label>
-                  <select value={ruleProductId} onChange={(e) => setRuleProductId(e.target.value)}>
-                    <option value="">Select</option>
+                  <select value={ruleProductId} onChange={(e) => setRuleProductId(e.target.value)} disabled={ruleLoading}>
+                    <option value="">Select Product</option>
                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div className="ad-form-group">
                   <label>Requirement (e.g., Purity &gt; 99%)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Purity > 99%" 
-                    value={ruleRequirement} 
-                    onChange={(e) => setRuleRequirement(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="Purity > 99%"
+                    value={ruleRequirement}
+                    onChange={(e) => setRuleRequirement(e.target.value)}
+                    disabled={ruleLoading}
                   />
                 </div>
                 <div className="ad-form-group">
                   <label>Doc Type</label>
-                  <input 
-                    type="text" 
-                    placeholder="Certificate of Analysis" 
-                    value={ruleDocType} 
-                    onChange={(e) => setRuleDocType(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="Certificate of Analysis"
+                    value={ruleDocType}
+                    onChange={(e) => setRuleDocType(e.target.value)}
+                    disabled={ruleLoading}
                   />
                 </div>
                 <div className="ad-form-group">
                   <label>Category</label>
-                  <select value={ruleCategory} onChange={(e) => setRuleCategory(e.target.value as 'MASTER' | 'TRANSACTIONAL')}>
+                  <select value={ruleCategory} onChange={(e) => setRuleCategory(e.target.value as 'MASTER' | 'TRANSACTIONAL')} disabled={ruleLoading}>
                     <option value="MASTER">MASTER</option>
                     <option value="TRANSACTIONAL">TRANSACTIONAL</option>
                   </select>
                 </div>
-                <button onClick={handleDefineReqs} className="ad-btn primary">Save Rule</button>
+                <button onClick={handleDefineReqs} className="ad-btn primary" disabled={ruleLoading}>
+                  {ruleLoading ? 'Saving...' : 'Save Rule'}
+                </button>
               </div>
             </div>
 
@@ -536,25 +601,32 @@ const AdminDashboard = () => {
               <div className="ad-card-body">
                 <div className="ad-form-group">
                   <label>Product</label>
-                  <select value={masterDocProductId} onChange={(e) => setMasterDocProductId(e.target.value)}>
-                    <option value="">Select</option>
+                  <select value={masterDocProductId} onChange={(e) => setMasterDocProductId(e.target.value)} disabled={masterDocLoading}>
+                    <option value="">Select Product</option>
                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div className="ad-form-group">
                   <label>Type</label>
-                  <input 
-                    type="text" 
-                    placeholder="Standard Operating Procedure" 
-                    value={masterDocType} 
-                    onChange={(e) => setMasterDocType(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="Standard Operating Procedure"
+                    value={masterDocType}
+                    onChange={(e) => setMasterDocType(e.target.value)}
+                    disabled={masterDocLoading}
                   />
                 </div>
                 <div className="ad-form-group">
                   <label>File</label>
-                  <input type="file" onChange={e => e.target.files && setMasterDocFile(e.target.files[0])} />
+                  <input 
+                    type="file" 
+                    onChange={e => e.target.files && setMasterDocFile(e.target.files[0])}
+                    disabled={masterDocLoading}
+                  />
                 </div>
-                <button onClick={handleMasterDocUpload} disabled={!masterDocFile} className="ad-btn primary">Upload</button>
+                <button onClick={handleMasterDocUpload} disabled={!masterDocFile || masterDocLoading} className="ad-btn primary">
+                  {masterDocLoading ? 'Uploading...' : 'Upload'}
+                </button>
               </div>
             </div>
 
@@ -564,34 +636,42 @@ const AdminDashboard = () => {
               <div className="ad-card-body">
                 <div className="ad-form-group">
                   <label>Vendor</label>
-                  <select value={orderVendorId} onChange={(e) => setOrderVendorId(e.target.value)}>
-                    <option value="">Select</option>
-                    {vendors.filter(v => v.status === 'ACCEPTED').map(v => <option key={v.id} value={v.id}>{v.companyName}</option>)}
+                  <select value={orderVendorId} onChange={(e) => setOrderVendorId(e.target.value)} disabled={orderLoading}>
+                    <option value="">Select Vendor</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.companyName} ({v.status})</option>)}
                   </select>
                 </div>
                 <div className="ad-form-group">
                   <label>Product</label>
-                  <select value={orderProductId} onChange={(e) => setOrderProductId(e.target.value)}>
-                    <option value="">Select</option>
+                  <select value={orderProductId} onChange={(e) => setOrderProductId(e.target.value)} disabled={orderLoading}>
+                    <option value="">Select Product</option>
                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div className="ad-form-row">
                   <div className="ad-form-group">
                     <label>Quantity</label>
-                    <input type="number" value={orderQuantity} onChange={(e) => setOrderQuantity(Number(e.target.value))} />
+                    <input 
+                      type="number" 
+                      value={orderQuantity} 
+                      onChange={(e) => setOrderQuantity(Number(e.target.value))}
+                      disabled={orderLoading}
+                    />
                   </div>
                   <div className="ad-form-group">
                     <label>Destination</label>
-                    <input 
-                      type="text" 
-                      placeholder="USA" 
-                      value={orderDestination} 
-                      onChange={(e) => setOrderDestination(e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="USA"
+                      value={orderDestination}
+                      onChange={(e) => setOrderDestination(e.target.value)}
+                      disabled={orderLoading}
                     />
                   </div>
                 </div>
-                <button onClick={handleCreateRequest} className="ad-btn success">Create Order</button>
+                <button onClick={handleCreateRequest} className="ad-btn success" disabled={orderLoading}>
+                  {orderLoading ? 'Creating...' : 'Create Order'}
+                </button>
               </div>
             </div>
           </div>
@@ -604,7 +684,7 @@ const AdminDashboard = () => {
                 <table className="ad-table">
                   <thead><tr><th>Order #</th><th>Tracking #</th><th>Status</th><th>Location</th></tr></thead>
                   <tbody>
-                    {shipments.length === 0 && <tr><td colSpan={4} style={{textAlign: 'center', padding: '2rem', color: '#9ca3af'}}>No active shipments</td></tr>}
+                    {shipments.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>No active shipments</td></tr>}
                     {shipments.map(s => (
                       <tr key={s.id} onClick={() => handleSelectShipment(s.id)} className={selectedShipment === s.id ? 'selected' : ''}>
                         <td>{s.orderNumber}</td>
@@ -616,7 +696,7 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
-              
+
               {selectedShipmentData && (
                 <div className="ad-tracking-panel">
                   <div className="ad-tracking-header">
@@ -625,7 +705,7 @@ const AdminDashboard = () => {
                   </div>
                   <div className="ad-tracking-content">
                     <div className="ad-tracking-map-container">
-                      {loadingTracking ? <div className="ad-map-loading">Loading Map Data...</div> : 
+                      {loadingTracking ? <div className="ad-map-loading">Loading Map Data...</div> :
                         <GoogleMapViewer lat={selectedShipmentData.lat} lng={selectedShipmentData.lng} />
                       }
                     </div>

@@ -1,28 +1,26 @@
 import { Router } from 'express';
-import { 
-  getMyOrders,
-  acceptOrder,
-  uploadDocument,
-  createShipment,
-} from '../controllers/vendor.controller';
 import { authenticateToken, authorizeRole } from '../middleware/auth';
+import * as vendorController from '../controllers/vendor.controller';
 
 const router = Router();
 
-// All routes require authentication and VENDOR role
+// All routes require VENDOR role
 router.use(authenticateToken);
 router.use(authorizeRole('VENDOR'));
 
-// Get orders assigned to this vendor
-router.get('/orders', getMyOrders);
+// Get vendor's orders
+router.get('/orders', vendorController.getMyOrders);
 
-// Accept an order request
-router.post('/orders/:orderId/accept', acceptOrder);
+// Accept vendor invitation
+router.post('/invitation/accept', vendorController.acceptInvitation);
 
-// Upload a compliance document
-router.post('/documents/upload', uploadDocument);
+// Accept an order
+router.post('/orders/:orderId/accept', vendorController.acceptOrder);
 
-// Create shipment with tracking
-router.post('/shipments/create', createShipment);
+// Upload document
+router.post('/documents/upload', vendorController.uploadDocument);
+
+// Create shipment
+router.post('/shipments/create', vendorController.createShipment);
 
 export default router;

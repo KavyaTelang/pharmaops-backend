@@ -1,73 +1,71 @@
 import { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { api } from '../services/api';
 
 const VendorDashboard = () => {
-  // ===== USE CONTEXT =====
-  const {
-    user,
-    products,
-    vendors,
-    orders
-  } = useAppContext();
-
-  // ===== LOCAL STATE =====
+  // ===== STATE =====
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [vendorProfile, setVendorProfile] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  
   const [shipmentModalOpen, setShipmentModalOpen] = useState<string | null>(null);
   const [trackingInput, setTrackingInput] = useState('');
   const [courierInput, setCourierInput] = useState('');
-  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
 
-  // ===== AUTO-SELECT FIRST VENDOR =====
+  // ===== LOAD DATA =====
   useEffect(() => {
-    if (vendors.length > 0 && !selectedVendorId) {
-      setSelectedVendorId(vendors[0].id);
+    loadVendorData();
+  }, []);
+
+  const loadVendorData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getMyOrders();
+      console.log('Vendor data loaded:', data);
+      
+      setVendorProfile(data.vendorProfile);
+      setOrders(data.orders || []);
+    } catch (error: any) {
+      console.error('Failed to load vendor data:', error);
+      setError(error.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
     }
-  }, [vendors, selectedVendorId]);
-
-  // Get current vendor
-  const currentVendor = vendors.find(v => v.id === selectedVendorId);
-
-  // Filter orders for this vendor
-  const vendorOrders = orders.filter(o => o.vendorId === selectedVendorId);
-
-  // ===== HELPER: Get Product by ID =====
-  const getProductById = (productId: string) => {
-    return products.find(p => p.id === productId);
   };
 
   // ===== COMPUTED STATS =====
   const stats = {
-    newRequests: vendorOrders.filter(o => o.status === 'REQUESTED').length,
-    actionRequired: vendorOrders.flatMap(o => o.requirements || []).filter(r => r.status === 'MISSING').length,
-    readyToShip: vendorOrders.filter(o => o.status === 'READY_TO_SHIP').length,
+    newRequests: orders.filter(o => o.status === 'REQUESTED').length,
+    actionRequired: orders.flatMap(o => o.requirements || []).filter(r => r.status === 'MISSING').length,
+    readyToShip: orders.filter(o => o.status === 'READY_TO_SHIP').length,
   };
 
-  // ===== HANDLERS (updated to use real API) =====
+  // ===== HANDLERS =====
   const handleAcceptInvitation = async () => {
-    if (!selectedVendorId) return;
-
     try {
-      // TODO: Add accept invitation endpoint to backend
+      await api.acceptInvitation();
       alert(`✅ Partnership accepted! You can now receive orders.`);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-    } catch (error) {
-      alert('Failed to accept invitation');
+      await loadVendorData();
+    } catch (error: any) {
+      alert(`❌ Failed to accept invitation: ${error.message}`);
     }
   };
 
   const handleAcceptOrder = async (orderId: string) => {
     try {
-      // TODO: Add accept order endpoint to backend
-      // await api.acceptOrder(orderId);
-
+      await api.acceptOrder(orderId);
+      
       const order = orders.find(o => o.id === orderId);
-      alert(`✅ Order ${order?.orderNumber} accepted! Compliance checklist generated.`);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-    } catch (error) {
-      alert('Failed to accept order');
+      alert(`✅ Order ${order?.orderNumber} accepted!\n\nCompliance checklist generated. Please upload required documents.`);
+      
+      await loadVendorData();
+    } catch (error: any) {
+      alert(`❌ Failed to accept order: ${error.message}`);
     }
   };
 
-  const handleUpload = (_orderId: string, _docType: string) => {
+  const handleUpload = (orderId: string, docType: string) => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'application/pdf';
@@ -76,13 +74,16 @@ const VendorDashboard = () => {
       const file = target.files?.[0];
       if (file) {
         try {
-          // TODO: Add document upload endpoint to backend
-          // await api.uploadDocument(orderId, docType, file);
+          await api.uploadDocument({
+            orderId,
+            docType,
+            fileName: file.name,
+          });
 
-          alert(`✅ Document uploaded: ${file.name}\nSent to QA for review.`);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-        } catch (error) {
-          alert('Failed to upload document');
+          alert(`✅ Document uploaded: ${file.name}\n\nSent to QA for review. You'll be notified when approved.`);
+          await loadVendorData();
+        } catch (error: any) {
+          alert(`❌ Failed to upload document: ${error.message}`);
         }
       }
     };
@@ -97,19 +98,22 @@ const VendorDashboard = () => {
     }
 
     try {
-      // TODO: Add create shipment endpoint to backend
-      // await api.createShipment(shipmentModalOpen, trackingInput, courierInput);
+      await api.createShipment({
+        orderId: shipmentModalOpen,
+        trackingNumber: trackingInput,
+        courier: courierInput,
+      });
 
       const order = orders.find(o => o.id === shipmentModalOpen);
-      alert(`✅ Shipment created for Order ${order?.orderNumber}!\nTracking: ${trackingInput}`);
+      alert(`✅ Shipment created for Order ${order?.orderNumber}!\n\nTracking: ${trackingInput}\nCourier: ${courierInput}\n\nOrder status updated to IN_TRANSIT.`);
 
       setShipmentModalOpen(null);
       setTrackingInput('');
       setCourierInput('');
 
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-    } catch (error) {
-      alert('Failed to create shipment');
+      await loadVendorData();
+    } catch (error: any) {
+      alert(`❌ Failed to create shipment: ${error.message}`);
     }
   };
 
@@ -134,7 +138,7 @@ const VendorDashboard = () => {
 
   // ===== SUB-COMPONENTS =====
   const renderInvitationNotice = () => {
-    if (!currentVendor || currentVendor.status !== 'INVITED') return null;
+    if (!vendorProfile || vendorProfile.status !== 'INVITED') return null;
 
     return (
       <div className="vd-card vd-animate-in" style={{ background: '#fef3c7', borderLeft: '4px solid #f59e0b', marginBottom: '2rem' }}>
@@ -152,7 +156,7 @@ const VendorDashboard = () => {
   };
 
   const renderIncomingRequests = () => {
-    const requested = vendorOrders.filter(o => o.status === 'REQUESTED');
+    const requested = orders.filter(o => o.status === 'REQUESTED');
     if (requested.length === 0) return <div className="vd-empty">No new requests.</div>;
 
     return (
@@ -168,22 +172,19 @@ const VendorDashboard = () => {
             </tr>
           </thead>
           <tbody>
-            {requested.map(order => {
-              const product = getProductById(order.productId);
-              return (
-                <tr key={order.id} className="vd-table-row-hover">
-                  <td className="font-medium">{order.orderNumber}</td>
-                  <td>{product?.name || 'Unknown'}</td>
-                  <td>{order.quantity.toLocaleString()}</td>
-                  <td>{order.destination}</td>
-                  <td className="align-right">
-                    <button onClick={() => handleAcceptOrder(order.id)} className="vd-btn primary">
-                      Accept Order
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {requested.map(order => (
+              <tr key={order.id} className="vd-table-row-hover">
+                <td className="font-medium">{order.orderNumber}</td>
+                <td>{order.productName}</td>
+                <td>{order.quantity.toLocaleString()}</td>
+                <td>{order.destination}</td>
+                <td className="align-right">
+                  <button onClick={() => handleAcceptOrder(order.id)} className="vd-btn primary">
+                    Accept Order
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -191,19 +192,23 @@ const VendorDashboard = () => {
   };
 
   const renderComplianceList = () => {
-    const activeOrders = vendorOrders.filter(o => o.status === 'DOCS_PENDING' || o.status === 'READY_TO_SHIP');
+    const activeOrders = orders.filter(o => 
+      o.status === 'DOCS_PENDING' || 
+      o.status === 'READY_TO_SHIP' ||
+      o.status === 'IN_TRANSIT'
+    );
 
     if (activeOrders.length === 0) return <div className="vd-empty">No active compliance tasks.</div>;
 
     return (
       <div className="vd-compliance-section">
         {activeOrders.map(order => {
-          const product = getProductById(order.productId);
           const requirements = order.requirements || [];
           const totalReqs = requirements.length;
-          const approvedReqs = requirements.filter(r => r.status === 'APPROVED').length;
+          const approvedReqs = requirements.filter((r: any) => r.status === 'APPROVED').length;
           const progress = totalReqs > 0 ? Math.round((approvedReqs / totalReqs) * 100) : 0;
           const isReady = order.status === 'READY_TO_SHIP';
+          const isShipped = order.status === 'IN_TRANSIT';
 
           return (
             <div key={order.id} className={`vd-card vd-todo-item vd-animate-in ${isReady ? 'ready-border' : ''}`}>
@@ -211,7 +216,7 @@ const VendorDashboard = () => {
                 <div>
                   <div className="vd-order-id">
                     {order.orderNumber}
-                    <span className="vd-badge-count">{product?.name || 'Unknown Product'}</span>
+                    <span className="vd-badge-count">{order.productName}</span>
                   </div>
                   <div className="vd-order-meta">
                     <span className="meta-label">Dest:</span> {order.destination} &nbsp;|&nbsp;
@@ -225,18 +230,24 @@ const VendorDashboard = () => {
                   </div>
                 </div>
                 <div className="action-container">
-                  <button
-                    className={`vd-btn ${isReady ? 'primary' : 'disabled'}`}
-                    disabled={!isReady}
-                    onClick={() => isReady && setShipmentModalOpen(order.id)}
-                  >
-                    {isReady ? '🚚 Ship Order' : `Wait for QA (${approvedReqs}/${totalReqs})`}
-                  </button>
+                  {isShipped ? (
+                    <button className="vd-btn disabled" disabled>
+                      ✓ Shipped
+                    </button>
+                  ) : (
+                    <button
+                      className={`vd-btn ${isReady ? 'primary' : 'disabled'}`}
+                      disabled={!isReady}
+                      onClick={() => isReady && setShipmentModalOpen(order.id)}
+                    >
+                      {isReady ? '🚚 Ship Order' : `Wait for QA (${approvedReqs}/${totalReqs})`}
+                    </button>
+                  )}
                 </div>
               </div>
 
               <div className="vd-req-list">
-                {requirements.map(req => (
+                {requirements.map((req: any) => (
                   <div key={req.id} className="vd-req-row">
                     <div className="vd-req-info">
                       <span className="vd-req-status-icon" style={{ color: getStatusColor(req.status) }}>
@@ -249,13 +260,10 @@ const VendorDashboard = () => {
                             {req.category}
                           </span>
                         </div>
-                        {req.expiryDate && (
-                          <div className="vd-req-expiry">Valid until: {req.expiryDate}</div>
-                        )}
                       </div>
                     </div>
                     <div className="vd-req-action">
-                      {req.status === 'MISSING' && (
+                      {req.status === 'MISSING' && !isShipped && (
                         <button onClick={() => handleUpload(order.id, req.docType)} className="vd-btn upload small">
                           📎 Upload PDF
                         </button>
@@ -273,17 +281,42 @@ const VendorDashboard = () => {
     );
   };
 
-  // Show loading state
-  if (!user && vendors.length === 0) {
+  // ===== LOADING STATE =====
+  if (loading) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', background: 'white', minHeight: '100vh' }}>
         <h2>Loading vendor dashboard...</h2>
+        <p style={{ color: '#6b7280', marginTop: '1rem' }}>Fetching your orders and compliance tasks...</p>
       </div>
     );
   }
 
-  // If no vendor exists or not accepted, show limited view
-  if (!currentVendor) {
+  // ===== ERROR STATE =====
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', background: 'white', minHeight: '100vh' }}>
+        <h2 style={{ color: '#dc2626' }}>⚠️ Error Loading Dashboard</h2>
+        <p style={{ color: '#6b7280', marginTop: '1rem' }}>{error}</p>
+        <button 
+          onClick={loadVendorData}
+          style={{ 
+            marginTop: '1rem', 
+            padding: '0.5rem 1rem', 
+            background: '#059669', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // ===== NO VENDOR PROFILE =====
+  if (!vendorProfile) {
     return (
       <div className="vd-container">
         <header className="vd-header">
@@ -481,8 +514,8 @@ const VendorDashboard = () => {
             <h1>PharmaOps <span>Vendor</span></h1>
           </div>
           <div className="vd-user-profile">
-            <span>{currentVendor.companyName}</span>
-            <div className="vd-avatar">{currentVendor.companyName.charAt(0)}</div>
+            <span>{vendorProfile.companyName}</span>
+            <div className="vd-avatar">{vendorProfile.companyName.charAt(0)}</div>
           </div>
         </header>
 
@@ -491,7 +524,7 @@ const VendorDashboard = () => {
           {renderInvitationNotice()}
 
           {/* Stats Grid */}
-          {currentVendor.status === 'ACCEPTED' && (
+          {vendorProfile.status === 'ACCEPTED' && (
             <div className="vd-stats-grid">
               <div className="vd-stat-card yellow">
                 <span className="vd-stat-title">📬 New Requests</span>
@@ -509,7 +542,7 @@ const VendorDashboard = () => {
           )}
 
           {/* Incoming Requests */}
-          {currentVendor.status === 'ACCEPTED' && (
+          {vendorProfile.status === 'ACCEPTED' && (
             <section>
               <div className="vd-section-title">
                 📋 Incoming Requests
@@ -520,7 +553,7 @@ const VendorDashboard = () => {
           )}
 
           {/* Compliance & Shipping Tasks */}
-          {currentVendor.status === 'ACCEPTED' && (
+          {vendorProfile.status === 'ACCEPTED' && (
             <section>
               <div className="vd-section-title">
                 📦 Compliance & Shipping Tasks
@@ -534,7 +567,7 @@ const VendorDashboard = () => {
         {shipmentModalOpen && (
           <div className="vd-modal-overlay">
             <div className="vd-modal vd-animate-in">
-              <h3>Create Shipment for {vendorOrders.find(o => o.id === shipmentModalOpen)?.orderNumber}</h3>
+              <h3>Create Shipment for {orders.find(o => o.id === shipmentModalOpen)?.orderNumber}</h3>
               <p style={{ marginBottom: '1.5rem', color: '#6b7280', fontSize: '0.9rem' }}>
                 Compliance verified. Enter logistics details to generate label.
               </p>

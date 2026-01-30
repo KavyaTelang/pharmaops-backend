@@ -3,7 +3,7 @@ const API_BASE_URL = 'http://localhost:3000/api';
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('authToken');
   
-  console.log('Making API call:', endpoint, 'with token:', token ? 'YES' : 'NO'); // Debug log
+  console.log('Making API call:', endpoint, 'with token:', token ? 'YES' : 'NO');
   
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -14,7 +14,7 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
     },
   });
 
-  console.log('Response status:', response.status); // Debug log
+  console.log('Response status:', response.status);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
@@ -32,7 +32,7 @@ export const api = {
       body: JSON.stringify({ email, password }),
     });
     
-    console.log('Login response:', data); // Debug log
+    console.log('Login response:', data);
     
     localStorage.setItem('authToken', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
@@ -50,6 +50,8 @@ export const api = {
   getProducts: () => apiCall('/admin/products'),
   getVendors: () => apiCall('/admin/vendors'),
   getOrders: () => apiCall('/admin/orders'),
+  getDocuments: () => apiCall('/admin/documents'),
+  getShipments: () => apiCall('/admin/shipments'),
   
   createOrder: (data: { vendorId: string; productId: string; quantity: number; destination: string }) =>
     apiCall('/admin/orders/create-request', {
@@ -77,6 +79,10 @@ export const api = {
 
   // ===== VENDOR ENDPOINTS =====
   getMyOrders: () => apiCall('/vendor/orders'),
+
+  acceptInvitation: () => apiCall('/vendor/invitation/accept', {
+    method: 'POST',
+  }),
 
   acceptOrder: (orderId: string) =>
     apiCall(`/vendor/orders/${orderId}/accept`, {

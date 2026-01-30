@@ -13,15 +13,15 @@ export interface AuthRequest extends Request {
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // BYPASS AUTHENTICATION FOR TESTING
-    console.log('⚠️ AUTH BYPASS ENABLED: Defaulting to Vendor User');
+    console.log('⚠️ AUTH BYPASS ENABLED: Defaulting to Admin User');
 
     const userRepo = AppDataSource.getRepository(User);
-    // Hardcode to the vendor user email we know exists from seed.ts
-    const user = await userRepo.findOne({ where: { email: 'vendor@fastlogistics.com' } });
+    // Hardcode to the admin user email we know exists from seed.ts
+    const user = await userRepo.findOne({ where: { email: 'admin@pharmacorp.com' } });
 
     if (!user) {
-      console.log('Auth middleware - Vendor Default User not found in DB');
-      return res.status(500).json({ error: 'Default vendor user not found' });
+      console.log('Auth middleware - Admin Default User not found in DB');
+      return res.status(500).json({ error: 'Default admin user not found' });
     }
 
     console.log('Auth middleware - Auto-logged in as:', user.email, 'Role:', user.role);
